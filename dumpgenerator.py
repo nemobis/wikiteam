@@ -19,10 +19,7 @@
 # To learn more, read the documentation:
 #     https://github.com/WikiTeam/wikiteam/wiki
 
-try:
-    from kitchen.text.converters import getwriter, to_unicode
-except ImportError:
-    print("Please install the kitchen module.")
+from __future__ import unicode_literals
 import http.cookiejar
 import pickle
 import datetime
@@ -60,8 +57,6 @@ try:
     from urllib.parse import urlparse, urlunparse
 except ImportError:
     from urllib.parse import urlparse, urlunparse
-UTF8Writer = getwriter('utf8')
-sys.stdout = UTF8Writer(sys.stdout)
 
 __VERSION__ = '0.4.0-alpha'  # major, minor, micro: semver.org
 
@@ -85,7 +80,7 @@ def getVersion():
 def truncateFilename(other={}, filename=''):
     """ Truncate filenames when downloading images with large filenames """
     return filename[:other['filenamelimit']] + \
-        md5(filename.encode('utf-8')).hexdigest() + '.' + filename.split('.')[-1]
+        md5(filename).hexdigest() + '.' + filename.split('.')[-1]
 
 
 def delay(config={}, session=None):
@@ -264,7 +259,7 @@ def getPageTitlesAPI(config={}, session=None):
                 'action': 'query',
                 'list': 'allpages',
                 'apnamespace': namespace,
-                'apfrom': apfrom.encode('utf-8'),
+                'apfrom': apfrom,
                 'format': 'json',
                 'aplimit': 500}
 
@@ -427,7 +422,7 @@ def getPageTitles(config={}, session=None):
     titlesfile = open('%s/%s' % (config['path'], titlesfilename), 'wt')
     c = 0
     for title in titles:
-        titlesfile.write(title.encode('utf-8') + "\n")
+        titlesfile.write(title + "\n")
         c += 1
     # TODO: Sort to remove dupes? In CZ, Widget:AddThis appears two times:
     # main namespace and widget namespace.
@@ -541,7 +536,7 @@ def logerror(config={}, text=''):
         with open('%s/errors.log' % (config['path']), 'a') as outfile:
             output = '%s: %s\n' % (
                 datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), text)
-            outfile.write(output.encode('utf-8'))
+            outfile.write(output)
 
 
 def getXMLPageCore(headers={}, params={}, config={}, session=None):
@@ -739,7 +734,7 @@ def generateXMLDump(config={}, titles=[], start=None, session=None):
     if config['xmlrevisions']:
         print('Retrieving the XML for every page from the beginning')
         xmlfile = open('%s/%s' % (config['path'], xmlfilename), 'w')
-        xmlfile.write(header.encode('utf-8'))
+        xmlfile.write(header)
         try:
             r_timestamp = r'<timestamp>([^<]+)</timestamp>'
             for xml in getXMLRevisions(config=config, session=session):
@@ -747,7 +742,7 @@ def generateXMLDump(config={}, titles=[], start=None, session=None):
                 # Due to how generators work, it's expected this may be less
                 print("%d more revisions exported" % numrevs)
                 xml = cleanXML(xml=xml)
-                xmlfile.write(xml.encode('utf-8'))
+                xmlfile.write(xml)
         except AttributeError:
             print("This wikitools module version is not working")
             sys.exit()
@@ -761,7 +756,7 @@ def generateXMLDump(config={}, titles=[], start=None, session=None):
             # requested complete xml dump
             lock = False
             xmlfile = open('%s/%s' % (config['path'], xmlfilename), 'w')
-            xmlfile.write(header.encode('utf-8'))
+            xmlfile.write(header)
             xmlfile.close()
 
         xmlfile = open('%s/%s' % (config['path'], xmlfilename), 'a')
@@ -779,7 +774,7 @@ def generateXMLDump(config={}, titles=[], start=None, session=None):
             try:
                 for xml in getXMLPage(config=config, title=title, session=session):
                     xml = cleanXML(xml=xml)
-                    xmlfile.write(xml.encode('utf-8'))
+                    xmlfile.write(xml)
             except PageMissingError:
                 logerror(
                     config=config,
@@ -893,20 +888,20 @@ def makeXmlFromPage(page):
     try:
         p = E.page(
                 E.title(page['title']),
-                E.ns(to_unicode(page['ns'])),
-                E.id(to_unicode(page['pageid'])),
+                E.ns(page['ns']),
+                E.id(page['pageid']),
         )
         for rev in page['revisions']:
             revision = E.revision(
-                E.id(to_unicode(rev['revid'])),
-                E.parentid(to_unicode(rev['parentid'])),
+                E.id(rev['revid']),
+                E.parentid(rev['parentid']),
                 E.timestamp(rev['timestamp']),
                 E.contributor(
-                        E.id(to_unicode(rev['userid'])),
-                        E.username(to_unicode(rev['user'])),
+                        E.id(rev['userid']),
+                        E.username(rev['user']),
                 ),
                 E.comment(rev['comment']),
-                E.text(rev['*'], space="preserve", bytes=to_unicode(rev['size'])),
+                E.text(rev['*'], space="preserve", bytes=rev['size']),
             )
             if 'contentmodel' in rev:
                 revision.append(E.model(rev['contentmodel']))
@@ -999,7 +994,7 @@ def saveImageNames(config={}, images=[], session=None):
                  uploader) for filename,
                 url,
                 uploader in images]
-            ).encode('utf-8')
+            )
          )
     )
     imagesfile.write('\n--END--')
@@ -1185,11 +1180,11 @@ def getImageNamesAPI(config={}, session=None):
                 url = curateImageURL(config=config, url=url)
                 # encoding to ascii is needed to work around this horrible bug:
                 # http://bugs.python.org/issue8136
-                if 'api' in config and '.wikia.com' in config['api']:
+                if 'api' in config and ( '.wikia' in config['api'] or '.fandom.com' in config['api']):
                     #to avoid latest?cb=20120816112532 in filenames
-                    filename = str(urllib.parse.unquote((re.sub('_', ' ', url.split('/')[-3])).encode('ascii', 'ignore')), 'utf-8')
+                    filename = urllib.parse.unquote(re.sub('_', ' ', url.split('/')[-3])
                 else:
-                    filename = str(urllib.parse.unquote((re.sub('_', ' ', url.split('/')[-1])).encode('ascii', 'ignore')), 'utf-8')
+                    filename = urllib.parse.unquote(re.sub('_', ' ', url.split('/')[-1]))
                 uploader = re.sub('_', ' ', image['user'])
                 images.append([filename, url, uploader])
         else:
@@ -1323,7 +1318,7 @@ def generateImageDump(config={}, other={}, images=[], start='', session=None):
         if not re.search(r'</mediawiki>', xmlfiledesc):
             # failure when retrieving desc? then save it as empty .desc
             xmlfiledesc = ''
-        f.write(xmlfiledesc.encode('utf-8'))
+        f.write(xmlfiledesc)
         f.close()
         delay(config=config, session=session)
         c += 1
@@ -1377,7 +1372,7 @@ def loadConfig(config={}, configfilename=''):
     """ Load config file """
 
     try:
-        with open('%s/%s' % (config['path'], configfilename), 'r') as infile:
+        with open('%s/%s' % (config['path'], configfilename), 'rb') as infile:
             config = pickle.load(infile)
     except:
         print('There is no config file. we can\'t resume. Start a new dump.')
@@ -1389,7 +1384,7 @@ def loadConfig(config={}, configfilename=''):
 def saveConfig(config={}, configfilename=''):
     """ Save config file """
 
-    with open('%s/%s' % (config['path'], configfilename), 'w') as outfile:
+    with open('%s/%s' % (config['path'], configfilename), 'wb') as outfile:
         pickle.dump(config, outfile)
 
 
@@ -2047,7 +2042,7 @@ def saveSpecialVersion(config={}, session=None):
         delay(config=config, session=session)
         raw = removeIP(raw=raw)
         with open('%s/Special:Version.html' % (config['path']), 'w') as outfile:
-            outfile.write(raw.encode('utf-8'))
+            outfile.write(raw)
 
 
 def saveIndexPHP(config={}, session=None):
@@ -2062,7 +2057,7 @@ def saveIndexPHP(config={}, session=None):
         delay(config=config, session=session)
         raw = removeIP(raw=raw)
         with open('%s/index.html' % (config['path']), 'w') as outfile:
-            outfile.write(raw.encode('utf-8'))
+            outfile.write(raw)
 
 def saveSiteInfo(config={}, session=None):
     """ Save a file with site info """
